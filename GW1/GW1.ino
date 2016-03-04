@@ -4,7 +4,7 @@
     7 Relais D7...D13 via ULN2003A (angezogen HIGH)
     I2C Port Expander A4, A5
       - PCF8574 P0...P7 LEDs (gegen VCC) Taster (gegen GND)
-    (Später: DCC Eingang D2)
+    DCC Eingang D2
 
     Konfiguration für Grindelwald Weichen 1-4
     
@@ -42,10 +42,12 @@
 
 #include <Wire.h>
 #include <Servo.h>
+#include <NmraDcc.h>
 
 boolean commAck = true;
 // DCC pin 
 const int dccPin = 2;
+const byte isROCO = 0  ;    // 4 falls Roco (sonst = 0)
 
 // ------- Konfiguration beginnt hier
 
@@ -79,6 +81,9 @@ const boolean gleisZust[][2] = {
 };       // On, Off
 
 // Definiere Gruppen
+const byte weichenAdr[] = {
+  6, 7, 3, 123};  // DCC-Weichenadressen 
+
 const int tasterZuord[] = { // Welcher Taster gehört zu welcher Gruppe
   0, 0, 1, 1
 };
@@ -109,6 +114,8 @@ const boolean gleisMatrix[][4] = { // jeder Taster eine Zeile
 
 // ------- Konfiguration endet hier
 
+// DCC objekt
+NmraDcc Dcc;
 
 // Servoobjekte erstellen
 Servo weichenServo[sizeof(servoPin)/2];
@@ -145,6 +152,35 @@ byte PCF8574_Read(int adresse) {
   return datenByte;
 }
 
+// Die folgende Funktion wird von Dcc.process() aufgerufen, wenn ein Weichentelegramm empfangen wurde
+void notifyDccAccState( uint16_t Addr, uint16_t BoardAddr, uint8_t OutputAddr, uint8_t State ){
+    // Weichenadresse berechnen
+    word wAddr = Addr+isROCO; // Roco zählt ab 0, alle anderen lassen die ersten 4 Weichenadressen frei
+
+#ifdef DEBUG
+    Serial.print("Addr ");
+    Serial.print(Addr);
+    Serial.print(" wAddr ");
+    Serial.print(wAddr);
+    Serial.print(" OutputAddr ");
+    Serial.print(OutputAddr);
+    Serial.println();
+#endif
+     
+    // Testen ob eigene Weichenadresse
+/*    for ( byte i = 0; i < ServoZahl; i++ ) {
+        if (  wAddr == weichenAdr[i] ) {
+            // ist eigene Adresse, Servo ansteuern
+            if ( OutputAddr & 0x1 ) {
+                weicheS[i].write( geradePulse[i] );
+            } else {
+                weicheS[i].write( abzweigPulse[i] );
+            }
+            break; // Schleifendurchlauf abbrechen, es kann nur eine Weiche sein
+        } 
+    }*/
+}
+
 
 void setup() {
   // initialize serial communication at 9600 bits per second:
@@ -165,13 +201,22 @@ void setup() {
    pinMode(gleisPin[i], OUTPUT);
    digitalWrite(gleisPin[i], LOW);
   }
+  // DCC initiaisieren
+  Dcc.init( MAN_ID_DIY, 15, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, 0 );
+  Dcc.pin(0, 2, 1); // Dcc-Signal an Pin2 ( = Int0 );
+
   // Lese Gruppenposition aus eeprom in pcfAlt
 
   // Alle PCF8574-Tasterpins wie vorher
   PCF8574_Write(PCF8574,pcfAlt);
 }
 
+
+
+
 void loop() {
+  Dcc.process(); // Hier werden die empfangenen Telegramme analysiert
+  
   // Read PCF8574
   pcfDaten=PCF8574_Read(PCF8574);
   if (commAck) {
