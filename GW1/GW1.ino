@@ -47,7 +47,7 @@
 boolean commAck = true;
 // DCC pin 
 const int dccPin = 2;
-const byte isROCO = 0  ;    // 4 falls Roco (sonst = 0)
+const byte isROCO = 4  ;    // 4 falls Roco (sonst = 0)
 
 // ------- Konfiguration beginnt hier
 
@@ -203,7 +203,7 @@ void setup() {
   }
   // DCC initiaisieren
   Dcc.init( MAN_ID_DIY, 15, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, 0 );
-  Dcc.pin(0, 2, 1); // Dcc-Signal an Pin2 ( = Int0 );
+  Dcc.pin(0, dccPin, 1); // Dcc-Signal an Pin2
 
   // Lese Gruppenposition aus eeprom in pcfAlt
 
