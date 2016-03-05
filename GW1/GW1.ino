@@ -6,6 +6,8 @@
       - PCF8574 P0...P7 LEDs (gegen VCC) Taster (gegen GND)
     DCC Eingang D2
 
+    BoardAddr 0 mit OutputAddr 0-7 enstpricht wAddr 1-4 mit je zwei Lagen
+    
     Konfiguration für Grindelwald Weichen 1-4
     
     
@@ -152,6 +154,61 @@ byte PCF8574_Read(int adresse) {
   return datenByte;
 }
 
+// Funktion zum schreiben von Weichen und Gleise
+
+byte schreibeWeichen(byte Befehl, byte Daten){                     // pcfNeu in Befehl, pcfDaten in Daten
+  for (int i = 0; i < sizeof(tasterZuord)/2; i++) {
+   int k = tasterZuord[i];                                         // k welche Weichengruppe
+   boolean isSet = bitRead(Befehl,i);
+   if (isSet) {                                                    // Taster gedrückt
+    for (int j = 0; j < sizeof(weichenGruppen[k])/2; j++) {
+     int l = weichenGruppen[k][j];                                 // l welche Weiche index 
+     int m = weichenMatrix[i][j];                                  // m welche Position Taster i Weiche l (an stelle j)
+#ifdef DEBUG
+    Serial.print("Taster ");
+    Serial.print(i);
+    Serial.print(" Gruppe ");
+    Serial.print(k);
+    Serial.print(" Weiche ");
+    Serial.print(l);
+    Serial.print(" Position ");
+    Serial.print(m);
+    Serial.print(" ServoPosition ");
+    Serial.print(servoPos[l][m]);
+    Serial.print(" HerzPol ");
+    Serial.print(herzPol[l][m]);
+    Serial.println();
+#endif     
+     weichenServo[l].write(servoPos[l][m]);
+     digitalWrite(herzPin[l], herzPol[l][m]);
+    }
+    for (int j = 0; j < sizeof(gleisGruppen[k])/2; j++) {
+     int l = gleisGruppen[k][j];                                   // l welches Gleisrelais
+     int m = gleisMatrix[i][j];                                    // m welchen Zustand Taster i Relais l
+#ifdef DEBUG
+    Serial.print("Taster ");
+    Serial.print(i);
+    Serial.print(" Gruppe ");
+    Serial.print(k);
+    Serial.print(" Gleis ");
+    Serial.print(l);
+    Serial.print(" Zustand ");
+    Serial.print(m);
+    Serial.print(" Pol ");
+    Serial.print(gleisZust[l][m]);
+    Serial.println();
+#endif
+     digitalWrite(gleisPin[l], gleisZust[l][m]);
+    }
+    Daten = Daten & tasterGruppen[k];                              // Clear (set High) alle anderen Taster nur der gleichen Gruppe
+    Daten = Daten | (tasterGruppen[k] ^ 0xFF);
+    bitClear(Daten,i);
+    break;                                                         // Schleifendurchlauf abbrechen, es kann nur ein Taster sein
+   }
+  };
+  return Daten;
+}
+
 // Die folgende Funktion wird von Dcc.process() aufgerufen, wenn ein Weichentelegramm empfangen wurde
 void notifyDccAccState( uint16_t Addr, uint16_t BoardAddr, uint8_t OutputAddr, uint8_t State ){
     // Weichenadresse berechnen
@@ -162,8 +219,12 @@ void notifyDccAccState( uint16_t Addr, uint16_t BoardAddr, uint8_t OutputAddr, u
     Serial.print(Addr);
     Serial.print(" wAddr ");
     Serial.print(wAddr);
+    Serial.print("BoardAddr ");
+    Serial.print(BoardAddr);
     Serial.print(" OutputAddr ");
     Serial.print(OutputAddr);
+    Serial.print(" State ");
+    Serial.print(State);
     Serial.println();
 #endif
      
@@ -226,66 +287,9 @@ void loop() {
     pcfNeu = 0x00;
     pcfDaten = pcfAlt;
   }
-  // Hier würde man den DCC befehl auslesen und in einen Tastendruck übersetzen
-  // Wahrscheinlich eher nicht, sondern eine Funktion würde aufgerufen, hmmm
-  // Also das hierunter in eine Funktion auslagern?
-  // Oder die Funktion schreibt pcfNeu, aber wie sichern, dass zur rechten Zeit?
-
-
 
   // Lese Taster, schreibe Weichen und Gleise
-  for (int i = 0; i < sizeof(tasterZuord)/2; i++) {
-   int k = tasterZuord[i];                                         // k welche Weichengruppe
-   boolean isSet = bitRead(pcfNeu,i);
-   if (isSet) {                                                    // Taster gedrückt
-    for (int j = 0; j < sizeof(weichenGruppen[k])/2; j++) {
-     int l = weichenGruppen[k][j];                                 // l welche Weiche index 
-     int m = weichenMatrix[i][j];                                  // m welche Position Taster i Weiche l (an stelle j)
-
-#ifdef DEBUG
-    Serial.print("Taster ");
-    Serial.print(i);
-    Serial.print(" Gruppe ");
-    Serial.print(k);
-    Serial.print(" Weiche ");
-    Serial.print(l);
-    Serial.print(" Position ");
-    Serial.print(m);
-    Serial.print(" ServoPosition ");
-    Serial.print(servoPos[l][m]);
-    Serial.print(" HerzPol ");
-    Serial.print(herzPol[l][m]);
-    Serial.println();
-#endif
-     
-     weichenServo[l].write(servoPos[l][m]);
-     digitalWrite(herzPin[l], herzPol[l][m]);
-    }
-    for (int j = 0; j < sizeof(gleisGruppen[k])/2; j++) {
-     int l = gleisGruppen[k][j];                                   // l welches Gleisrelais
-     int m = gleisMatrix[i][j];                                    // m welchen Zustand Taster i Relais l
-
-#ifdef DEBUG
-    Serial.print("Taster ");
-    Serial.print(i);
-    Serial.print(" Gruppe ");
-    Serial.print(k);
-    Serial.print(" Gleis ");
-    Serial.print(l);
-    Serial.print(" Zustand ");
-    Serial.print(m);
-    Serial.print(" Pol ");
-    Serial.print(gleisZust[l][m]);
-    Serial.println();
-#endif
-
-     digitalWrite(gleisPin[l], gleisZust[l][m]);
-    }
-    pcfDaten = pcfDaten & tasterGruppen[k];                        // Clear (set High) alle anderen Taster nur der gleichen Gruppe
-    pcfDaten = pcfDaten | (tasterGruppen[k] ^ 0xFF);
-    bitClear(pcfDaten,i);
-   }
-  }
+  pcfDaten = schreibeWeichen(pcfNeu, pcfDaten);
   // Schreibe Tasten/LED status
   PCF8574_Write(PCF8574,pcfDaten);
   
