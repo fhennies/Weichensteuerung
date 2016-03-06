@@ -62,7 +62,7 @@ const int servoPin[] = {
 const int herzPin[] = {
   7, 8, 9, 10 };    // Herzstück-Relais an D7...D10
 const int servoPos[][2] = {
-  {110, 10},
+  {90, 95},
   {120, 20},
   {130, 30},
   {140, 40} 
@@ -241,8 +241,17 @@ void setup() {
   // initialize I2C
   Wire.begin();
   // Attach Servos
-  for (int i = 0; i < sizeof(servoPin[i])/2; i++) {
+  for (int i = 0; i < sizeof(servoPin)/2; i++) {
    weichenServo[i].attach(servoPin[i]);
+#ifdef DEBUG
+    Serial.print("sizeof(servoPin)/2 ");
+    Serial.print(sizeof(servoPin)/2);
+    Serial.print("Schleifendurchlauf ");
+    Serial.print(i);
+    Serial.print(" Servo attached to Pin ");
+    Serial.print(servoPin[i]);
+    Serial.println();
+#endif
   }
   // Alle Herzstück-Pins output und LOW
   for (int i = 0; i < sizeof(herzPin)/2; i++) {
