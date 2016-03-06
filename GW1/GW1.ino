@@ -7,6 +7,8 @@
     DCC Eingang D2
 
     BoardAddr 0 mit OutputAddr 0-7 enstpricht wAddr 1-4 mit je zwei Lagen
+    BoardAddr 5 mit OutputAddr 0-7 enstpricht wAddr 21-24 mit je zwei Lagen
+    
     
     Konfiguration für Grindelwald Weichen 1-4
     
@@ -49,7 +51,6 @@
 boolean commAck = true;
 // DCC pin 
 const int dccPin = 2;
-const byte isROCO = 4  ;    // 4 falls Roco (sonst = 0)
 
 // ------- Konfiguration beginnt hier
 
@@ -83,8 +84,7 @@ const boolean gleisZust[][2] = {
 };       // On, Off
 
 // Definiere Gruppen
-const byte weichenAdr[] = {
-  6, 7, 3, 123};  // DCC-Weichenadressen 
+const uint16_t boardAdresse = 5;  // DCC-Weichenadressen ab 21
 
 const int tasterZuord[] = { // Welcher Taster gehört zu welcher Gruppe
   0, 0, 1, 1
@@ -211,15 +211,10 @@ byte schreibeWeichen(byte Befehl, byte Daten){                     // pcfNeu in 
 
 // Die folgende Funktion wird von Dcc.process() aufgerufen, wenn ein Weichentelegramm empfangen wurde
 void notifyDccAccState( uint16_t Addr, uint16_t BoardAddr, uint8_t OutputAddr, uint8_t State ){
-    // Weichenadresse berechnen
-    word wAddr = Addr+isROCO; // Roco zählt ab 0, alle anderen lassen die ersten 4 Weichenadressen frei
-
 #ifdef DEBUG
     Serial.print("Addr ");
     Serial.print(Addr);
-    Serial.print(" wAddr ");
-    Serial.print(wAddr);
-    Serial.print("BoardAddr ");
+    Serial.print(" BoardAddr ");
     Serial.print(BoardAddr);
     Serial.print(" OutputAddr ");
     Serial.print(OutputAddr);
@@ -228,18 +223,15 @@ void notifyDccAccState( uint16_t Addr, uint16_t BoardAddr, uint8_t OutputAddr, u
     Serial.println();
 #endif
      
-    // Testen ob eigene Weichenadresse
-/*    for ( byte i = 0; i < ServoZahl; i++ ) {
-        if (  wAddr == weichenAdr[i] ) {
-            // ist eigene Adresse, Servo ansteuern
-            if ( OutputAddr & 0x1 ) {
-                weicheS[i].write( geradePulse[i] );
-            } else {
-                weicheS[i].write( abzweigPulse[i] );
-            }
-            break; // Schleifendurchlauf abbrechen, es kann nur eine Weiche sein
-        } 
-    }*/
+    // Testen ob eigene Bordadresse
+    if ( BoardAddr == boardAdresse ) {
+      pcfNeu = 0x00;
+      bitSet(pcfNeu,OutputAddr);
+      // Lese Taster, schreibe Weichen und Gleise
+      pcfDaten = schreibeWeichen(pcfNeu, pcfDaten);
+      // Schreibe Tasten/LED status
+      PCF8574_Write(PCF8574,pcfDaten);
+    }
 }
 
 
@@ -265,38 +257,29 @@ void setup() {
   // DCC initiaisieren
   Dcc.init( MAN_ID_DIY, 15, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, 0 );
   Dcc.pin(0, dccPin, 1); // Dcc-Signal an Pin2
-
-  // Lese Gruppenposition aus eeprom in pcfAlt
-
+  // Lese Gruppenposition aus eeprom in pcfAlt, schreibe Weichen mit alten Positionen
+  // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   // Alle PCF8574-Tasterpins wie vorher
   PCF8574_Write(PCF8574,pcfAlt);
 }
 
-
-
-
 void loop() {
-  Dcc.process(); // Hier werden die empfangenen Telegramme analysiert
-  
   // Read PCF8574
   pcfDaten=PCF8574_Read(PCF8574);
-  if (commAck) {
+  if (commAck) {                                      //Könnte man in PCF_Read auslagern
     pcfNeu = pcfAlt ^ pcfDaten;
+    // Lese Taster, schreibe Weichen und Gleise
+    pcfDaten = schreibeWeichen(pcfNeu, pcfDaten);
+    // Schreibe Tasten/LED status
+    PCF8574_Write(PCF8574,pcfDaten);
   }
   else {
     pcfNeu = 0x00;
     pcfDaten = pcfAlt;
   }
-
-  // Lese Taster, schreibe Weichen und Gleise
-  pcfDaten = schreibeWeichen(pcfNeu, pcfDaten);
-  // Schreibe Tasten/LED status
-  PCF8574_Write(PCF8574,pcfDaten);
-  
-  // Vergleiche vorher nachher
-  //  if (pcfDaten != pcfAlt) {
-                                                                   // Schreibe Weichen-/Gleisfunktionen ins Eeprom, nur wenn geändert
+  // Hier werden die empfangenen DCC Daten analysiert
+  Dcc.process(); 
+  // Schreibe Weichen-/Gleisfunktionen ins Eeprom, nur wenn geändert, falls pcfNeu nicht 0x00
+  // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   pcfAlt = pcfDaten;
-  //}
-  delay(20);
   }
