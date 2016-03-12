@@ -45,7 +45,8 @@
 #define DEBUG
 
 #include <Wire.h>
-#include <Servo.h>
+#include <MobaTools.h>
+//#include <Servo.h>
 #include <NmraDcc.h>
 
 boolean commAck = true;
@@ -120,7 +121,7 @@ const boolean gleisMatrix[][4] = { // jeder Taster eine Zeile
 NmraDcc Dcc;
 
 // Servoobjekte erstellen
-Servo weichenServo[sizeof(servoPin)/2];
+Servo8 weichenServo[sizeof(servoPin)/2,true];
 
 // Definiere PCF8574 Port Expander
 #define PCF8574 0x39
@@ -243,15 +244,6 @@ void setup() {
   // Attach Servos
   for (int i = 0; i < sizeof(servoPin)/2; i++) {
    weichenServo[i].attach(servoPin[i]);
-#ifdef DEBUG
-    Serial.print("sizeof(servoPin)/2 ");
-    Serial.print(sizeof(servoPin)/2);
-    Serial.print("Schleifendurchlauf ");
-    Serial.print(i);
-    Serial.print(" Servo attached to Pin ");
-    Serial.print(servoPin[i]);
-    Serial.println();
-#endif
   }
   // Alle Herzstück-Pins output und LOW
   for (int i = 0; i < sizeof(herzPin)/2; i++) {
