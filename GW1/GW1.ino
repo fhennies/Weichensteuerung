@@ -9,8 +9,8 @@
     BoardAddr 0 mit OutputAddr 0-7 enstpricht wAddr 1-4 mit je zwei Lagen
     BoardAddr 5 mit OutputAddr 0-7 enstpricht wAddr 21-24 mit je zwei Lagen
     
-    
-    Konfiguration für Grindelwald Weichen 1-4
+    V1.0
+    Konfiguration für Grindelwald Weichen 1-4, gestestet
     
     
     Copyright 2016 Franz Hennies
@@ -52,6 +52,7 @@
 boolean commAck = true;
 // DCC pin 
 const int dccPin = 2;
+const boolean pulseOff = true;
 
 // ------- Konfiguration beginnt hier
 
@@ -63,16 +64,16 @@ const int servoPin[] = {
 const int herzPin[] = {
   7, 8, 9, 10 };    // Herzstück-Relais an D7...D10
 const int servoPos[][2] = {
-  {90, 95},
-  {120, 20},
-  {130, 30},
-  {140, 40} 
+  {86, 118},
+  {59, 79},
+  {60, 85},
+  {85, 112} 
 };       // geradePos, abzwPos
 const boolean herzPol[][2] = {
   {1, 0},
   {1, 0},
-  {1, 0},
-  {1, 0} 
+  {0, 1},
+  {0, 1} 
 };       // geradePos, abzwPos
 
 // Relais für Gleisspannug
@@ -81,7 +82,7 @@ const int gleisPin[] = {
 const boolean gleisZust[][2] = {
   {1, 0},
   {1, 0},
-  {1, 0}
+  {0, 1}
 };       // On, Off
 
 // Definiere Gruppen
@@ -121,7 +122,7 @@ const boolean gleisMatrix[][4] = { // jeder Taster eine Zeile
 NmraDcc Dcc;
 
 // Servoobjekte erstellen
-Servo8 weichenServo[sizeof(servoPin)/2,true];
+Servo8 weichenServo[sizeof(servoPin)/2];
 
 // Definiere PCF8574 Port Expander
 #define PCF8574 0x39
@@ -243,7 +244,7 @@ void setup() {
   Wire.begin();
   // Attach Servos
   for (int i = 0; i < sizeof(servoPin)/2; i++) {
-   weichenServo[i].attach(servoPin[i]);
+   weichenServo[i].attach(servoPin[i],pulseOff);
   }
   // Alle Herzstück-Pins output und LOW
   for (int i = 0; i < sizeof(herzPin)/2; i++) {
@@ -256,8 +257,8 @@ void setup() {
    digitalWrite(gleisPin[i], LOW);
   }
   // DCC initiaisieren
-  Dcc.init( MAN_ID_DIY, 15, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, 0 );
   Dcc.pin(0, dccPin, 1); // Dcc-Signal an Pin2
+  Dcc.init( MAN_ID_DIY, 15, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, 0 );
   // Lese Gruppenposition aus eeprom in pcfAlt, schreibe Weichen mit alten Positionen
   // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   // Alle PCF8574-Tasterpins wie vorher
