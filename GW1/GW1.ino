@@ -48,12 +48,14 @@
 #include <MobaTools.h>
 //#include <Servo.h>
 #include <NmraDcc.h>
+#include <EEPROM.h>
 
 boolean commAck = true;
 // DCC pin 
 const int dccPin = 2;
 const boolean pulseOff = true;
-
+const int servoSpeed = 15;
+const int statusEeprom = 0;
 // ------- Konfiguration beginnt hier
 
 // Servos an pins
@@ -205,7 +207,7 @@ byte schreibeWeichen(byte Befehl, byte Daten){                     // pcfNeu in 
     Daten = Daten & tasterGruppen[k];                              // Clear (set High) alle anderen Taster nur der gleichen Gruppe
     Daten = Daten | (tasterGruppen[k] ^ 0xFF);
     bitClear(Daten,i);
-    break;                                                         // Schleifendurchlauf abbrechen, es kann nur ein Taster sein
+//    break;                                                         // Schleifendurchlauf abbrechen, es kann nur ein Taster sein
    }
   };
   return Daten;
@@ -245,6 +247,7 @@ void setup() {
   // Attach Servos
   for (int i = 0; i < sizeof(servoPin)/2; i++) {
    weichenServo[i].attach(servoPin[i],pulseOff);
+   weichenServo[i].setSpeed(servoSpeed);
   }
   // Alle Herzstück-Pins output und LOW
   for (int i = 0; i < sizeof(herzPin)/2; i++) {
@@ -260,9 +263,11 @@ void setup() {
   Dcc.pin(0, dccPin, 1); // Dcc-Signal an Pin2
   Dcc.init( MAN_ID_DIY, 15, FLAGS_OUTPUT_ADDRESS_MODE | FLAGS_DCC_ACCESSORY_DECODER, 0 );
   // Lese Gruppenposition aus eeprom in pcfAlt, schreibe Weichen mit alten Positionen
+  pcfNeu=EEPROM.read(statusEeprom) ^ pcfAlt;
+  pcfDaten = schreibeWeichen(pcfNeu, pcfDaten);
   // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   // Alle PCF8574-Tasterpins wie vorher
-  PCF8574_Write(PCF8574,pcfAlt);
+  PCF8574_Write(PCF8574,pcfDaten);
 }
 
 void loop() {
@@ -282,6 +287,12 @@ void loop() {
   // Hier werden die empfangenen DCC Daten analysiert
   Dcc.process(); 
   // Schreibe Weichen-/Gleisfunktionen ins Eeprom, nur wenn geändert, falls pcfNeu nicht 0x00
+  if ((pcfNeu != 0x00) && (pcfNeu != pcfAlt)) {
+    Serial.println(pcfDaten, BIN);
+    Serial.println(pcfDaten ^ 0xFF, BIN);
+    Serial.println(pcfDaten ^ 0x00, BIN);
+    EEPROM.write(statusEeprom, pcfDaten);
+  }
   // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   pcfAlt = pcfDaten;
   }
